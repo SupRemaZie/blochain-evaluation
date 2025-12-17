@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Système de Vote Blockchain</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🗳️ Système de Vote Blockchain</h1>
+            <p class="subtitle">Vote décentralisé sur Sepolia</p>
+        </header>
+
+        <!-- Wallet Connection -->
+        <section class="card" id="wallet-section">
+            <h2>Connexion Wallet</h2>
+            <div id="wallet-status" class="wallet-status">
+                <p id="wallet-address">Non connecté</p>
+                <button id="connect-wallet" class="btn btn-primary">Connecter MetaMask</button>
+            </div>
+            <div id="wallet-info" class="wallet-info" style="display: none;">
+                <p><strong>Adresse:</strong> <span id="connected-address"></span></p>
+                <p><strong>Solde:</strong> <span id="wallet-balance"></span> ETH</p>
+                <p><strong>Rôles:</strong> <span id="user-roles"></span></p>
+            </div>
+        </section>
+
+        <!-- Workflow Status -->
+        <section class="card" id="workflow-section">
+            <h2>Statut du Workflow</h2>
+            <div class="workflow-status">
+                <p><strong>Phase actuelle:</strong> <span id="current-phase"></span></p>
+                <p id="vote-timer" style="display: none;"><strong>Temps avant vote:</strong> <span id="timer"></span></p>
+                <button id="refresh-status" class="btn btn-secondary">Actualiser</button>
+            </div>
+        </section>
+
+        <!-- Admin Section -->
+        <section class="card" id="admin-section" style="display: none;">
+            <h2>🔐 Administration</h2>
+            
+            <div class="admin-actions">
+                <h3>Enregistrer un Candidat</h3>
+                <div class="form-group">
+                    <input type="text" id="candidate-name" placeholder="Nom du candidat" class="input">
+                    <button id="register-candidate" class="btn btn-primary">Enregistrer</button>
+                </div>
+
+                <h3>Changer le Statut du Workflow</h3>
+                <div class="form-group">
+                    <select id="workflow-select" class="input">
+                        <option value="0">REGISTER_CANDIDATES</option>
+                        <option value="1">FOUND_CANDIDATES</option>
+                        <option value="2">VOTE</option>
+                        <option value="3">COMPLETED</option>
+                    </select>
+                    <button id="set-workflow" class="btn btn-primary">Changer</button>
+                </div>
+
+                <h3>Attribuer le Rôle FOUNDER</h3>
+                <div class="form-group">
+                    <input type="text" id="founder-address" placeholder="Adresse du founder" class="input">
+                    <button id="grant-founder" class="btn btn-primary">Attribuer</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Founder Section -->
+        <section class="card" id="founder-section" style="display: none;">
+            <h2>💰 Financement</h2>
+            <div class="form-group">
+                <select id="fund-candidate-select" class="input">
+                    <option value="">Sélectionner un candidat</option>
+                </select>
+                <input type="number" id="fund-amount" placeholder="Montant en ETH" step="0.001" class="input">
+                <button id="fund-candidate" class="btn btn-primary">Financer</button>
+            </div>
+        </section>
+
+        <!-- Candidates Section -->
+        <section class="card" id="candidates-section">
+            <h2>📋 Candidats</h2>
+            <div id="candidates-list" class="candidates-list">
+                <p class="loading">Chargement des candidats...</p>
+            </div>
+        </section>
+
+        <!-- Voting Section -->
+        <section class="card" id="voting-section" style="display: none;">
+            <h2>🗳️ Vote</h2>
+            <div id="voting-info" class="voting-info"></div>
+            <div id="vote-options" class="vote-options"></div>
+        </section>
+
+        <!-- Winner Section -->
+        <section class="card" id="winner-section" style="display: none;">
+            <h2>🏆 Vainqueur</h2>
+            <div id="winner-info" class="winner-info"></div>
+            <button id="determine-winner" class="btn btn-success">Déterminer le Vainqueur</button>
+        </section>
+
+        <!-- Transaction Status -->
+        <div id="transaction-status" class="transaction-status" style="display: none;">
+            <div class="transaction-content">
+                <p id="transaction-message"></p>
+                <a id="transaction-link" href="#" target="_blank" style="display: none;">Voir sur Etherscan</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
+
