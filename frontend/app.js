@@ -212,8 +212,15 @@ async function loadWorkflowStatus() {
 
     try {
         const status = await contract.workflowStatus();
-        const statusName = CONFIG.WORKFLOW_STATUS[status];
+        const statusNumber = Number(status);
+        const statusName = CONFIG.WORKFLOW_STATUS[statusNumber];
         document.getElementById('current-phase').textContent = statusName;
+        
+        // Mettre à jour le menu déroulant avec le statut actuel
+        const workflowSelect = document.getElementById('workflow-select');
+        if (workflowSelect) {
+            workflowSelect.value = statusNumber.toString();
+        }
 
         // Afficher le timer si en phase VOTE
         if (status == 2) {
