@@ -30,7 +30,7 @@ contract VotingSystem is AccessControl {
     
     WorkflowStatus public workflowStatus;
     uint256 public voteStartTime;
-    uint256 private constant ONE_HOUR = 3600; // 1 heure
+    uint256 private constant ONE_HOUR = 20; // 20 secondes pour les tests
     
     mapping(uint256 => Candidate) public candidates;
     uint256[] public candidateIds;
@@ -143,13 +143,13 @@ contract VotingSystem is AccessControl {
     /**
      * @dev Vote pour un candidat
      * @param candidateId ID du candidat pour lequel voter
-     * @notice Accessible uniquement en phase VOTE, après 1 heure d'activation
+     * @notice Accessible uniquement en phase VOTE, après 20 secondes d'activation
      */
     function vote(uint256 candidateId) 
         external 
         onlyWorkflowStatus(WorkflowStatus.VOTE) 
     {
-        // Vérifier que 1 heure s'est écoulée depuis l'activation de VOTE
+        // Vérifier que 20 secondes se sont écoulées depuis l'activation de VOTE
         if (block.timestamp < voteStartTime + ONE_HOUR) {
             revert VoteNotStarted();
         }

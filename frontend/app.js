@@ -176,7 +176,7 @@ async function loadWorkflowStatus() {
         if (status == 2) {
             const voteStartTime = await contract.voteStartTime();
             const currentTime = Math.floor(Date.now() / 1000);
-            const delaySeconds = 3600; // 1 heure
+            const delaySeconds = 20; // 20 secondes pour les tests
             const timeRemaining = Number(voteStartTime) + delaySeconds - currentTime;
 
             if (timeRemaining > 0) {
