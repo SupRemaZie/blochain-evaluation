@@ -247,8 +247,14 @@ async function loadWorkflowStatus() {
             document.getElementById('determine-winner').style.display = userRoles.admin ? 'block' : 'none';
             // Charger et afficher le vainqueur si pas encore affiché
             await loadWinner();
+            // Masquer la section de financement car la campagne est terminée
+            document.getElementById('founder-section').style.display = 'none';
         } else {
             document.getElementById('winner-section').style.display = 'none';
+            // Réafficher la section founder si l'utilisateur est founder et pas en COMPLETED
+            if (userRoles.founder) {
+                document.getElementById('founder-section').style.display = 'block';
+            }
         }
 
     } catch (error) {
@@ -615,6 +621,27 @@ async function fundCandidate() {
         return;
     }
 
+    // Vérifier que le workflow n'est pas en phase COMPLETED
+    if (!provider) {
+        provider = new ethers.BrowserProvider(window.ethereum);
+    }
+    
+    const contract = new ethers.Contract(
+        CONFIG.VOTING_SYSTEM_ADDRESS,
+        CONFIG.VOTING_SYSTEM_ABI,
+        provider
+    );
+    
+    try {
+        const status = await contract.workflowStatus();
+        if (Number(status) === 3) {
+            showTransactionStatus('Impossible de financer : la campagne de vote est terminée (phase COMPLETED)', 'error');
+            return;
+        }
+    } catch (error) {
+        console.error('Erreur lors de la vérification du statut:', error);
+    }
+
     const candidateId = document.getElementById('fund-candidate-select').value;
     const amount = document.getElementById('fund-amount').value;
 
@@ -625,6 +652,36 @@ async function fundCandidate() {
 
     try {
         const amountWei = ethers.parseEther(amount);
+        
+        // Vérifier le solde du wallet
+        if (!provider || !userAddress) {
+            alert('Veuillez vous connecter');
+            return;
+        }
+        
+        const balance = await provider.getBalance(userAddress);
+        
+        // Estimer les frais de gas (approximation : 0.001 ETH pour être sûr)
+        const estimatedGasCost = ethers.parseEther("0.001");
+        const totalNeeded = amountWei + estimatedGasCost;
+        
+        if (balance < totalNeeded) {
+            const balanceEth = ethers.formatEther(balance);
+            const neededEth = ethers.formatEther(totalNeeded);
+            const shortfallEth = ethers.formatEther(totalNeeded - balance);
+            
+            const errorMessage = `Solde insuffisant !\n\n` +
+                  `Solde disponible: ${parseFloat(balanceEth).toFixed(4)} ETH\n` +
+                  `Montant requis: ${parseFloat(amount).toFixed(4)} ETH\n` +
+                  `Frais de gas estimés: ~0.001 ETH\n` +
+                  `Total nécessaire: ${parseFloat(neededEth).toFixed(4)} ETH\n` +
+                  `Manque: ${parseFloat(shortfallEth).toFixed(4)} ETH\n\n` +
+                  `Veuillez réduire le montant ou ajouter des fonds à votre wallet.`;
+            
+            showTransactionStatus(errorMessage, 'error');
+            return;
+        }
+        
         showTransactionStatus('Financement du candidat...', 'pending');
         const tx = await votingSystem.fundCandidate(candidateId, { value: amountWei });
         showTransactionStatus('Transaction envoyée...', 'pending', tx.hash);
@@ -634,9 +691,17 @@ async function fundCandidate() {
         
         document.getElementById('fund-amount').value = '';
         await loadCandidates();
+        await loadWalletInfo(); // Recharger le solde après la transaction
     } catch (error) {
         console.error('Erreur:', error);
-        showTransactionStatus('Erreur: ' + error.message, 'error');
+        let errorMessage = error.message;
+        
+        // Améliorer les messages d'erreur pour les problèmes de solde
+        if (errorMessage.includes('insufficient funds') || errorMessage.includes('insufficient balance')) {
+            errorMessage = 'Solde insuffisant. Vérifiez que vous avez assez d\'ETH pour le financement et les frais de gas.';
+        }
+        
+        showTransactionStatus('Erreur: ' + errorMessage, 'error');
     }
 }
 
