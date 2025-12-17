@@ -32,10 +32,10 @@ const CONFIG = {
         "function balanceOf(address owner) view returns (uint256)"
     ],
     
-    // Rôles
+    // Rôles (seront calculés dynamiquement)
     ROLES: {
-        ADMIN_ROLE: "0x" + ethers.utils.keccak256(ethers.utils.toUtf8Bytes("ADMIN_ROLE")).slice(0, 2) + ethers.utils.keccak256(ethers.utils.toUtf8Bytes("ADMIN_ROLE")).slice(2),
-        FOUNDER_ROLE: "0x" + ethers.utils.keccak256(ethers.utils.toUtf8Bytes("FOUNDER_ROLE")).slice(0, 2) + ethers.utils.keccak256(ethers.utils.toUtf8Bytes("FOUNDER_ROLE")).slice(2)
+        ADMIN_ROLE: null, // Sera calculé avec ethers.utils.keccak256
+        FOUNDER_ROLE: null // Sera calculé avec ethers.utils.keccak256
     },
     
     // Statuts du workflow

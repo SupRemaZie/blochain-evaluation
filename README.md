@@ -6,6 +6,16 @@ Un système de vote complet et sécurisé implémenté en Solidity avec Foundry,
 
 Ce projet implémente un système de vote décentralisé avec les fonctionnalités suivantes :
 
+### 🌐 Interface Web Incluse
+
+Une interface web moderne et intuitive est disponible dans le dossier `frontend/` pour interagir facilement avec le système :
+- Connexion MetaMask
+- Visualisation des candidats en temps réel
+- Actions selon les rôles (ADMIN, FOUNDER, VOTANT)
+- Design moderne et responsive
+
+**Voir [frontend/README.md](frontend/README.md) pour plus d'informations.**
+
 - **Gestion des rôles** : Système de rôles basé sur OpenZeppelin AccessControl (ADMIN, FOUNDER, VOTANT)
 - **Workflow structuré** : 4 phases distinctes (REGISTER_CANDIDATES, FOUND_CANDIDATES, VOTE, COMPLETED)
 - **Financement des candidats** : Les founders peuvent financer les candidats pendant la phase FOUND_CANDIDATES
@@ -261,6 +271,13 @@ blochain-evaluation/
 │   └── VotingSystem.t.sol    # Tests complets
 ├── script/
 │   └── Deploy.s.sol          # Script de déploiement
+├── frontend/                 # Interface web
+│   ├── index.html           # Page principale
+│   ├── app.js               # Logique JavaScript
+│   ├── config.js            # Configuration des contrats
+│   ├── styles.css           # Styles CSS
+│   ├── README.md            # Documentation frontend
+│   └── QUICK_START.md       # Guide de démarrage rapide
 ├── lib/
 │   ├── forge-std/            # Bibliothèque Foundry
 │   └── openzeppelin-contracts/ # OpenZeppelin
