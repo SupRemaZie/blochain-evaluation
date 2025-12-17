@@ -1,7 +1,7 @@
 // Configuration des adresses des contrats déployés sur Sepolia
 const CONFIG = {
-    VOTE_NFT_ADDRESS: "0xdb9fcDD0006f1EafDC54d289d4593175F23dDbbd",
-    VOTING_SYSTEM_ADDRESS: "0x11a88B3Ba383F46B014Fcfd9FFB4457AD5211BEb",
+    VOTE_NFT_ADDRESS: "0x16e480d56DA571A689141C043e132AFDD1028ad6",
+    VOTING_SYSTEM_ADDRESS: "0x338158D4663775b98952Ce4E159E83025cF60693",
     SEPOLIA_RPC_URL: "https://sepolia.infura.io/v3/YOUR_INFURA_KEY", // À remplacer si nécessaire
     ETHERSCAN_URL: "https://sepolia.etherscan.io",
     

@@ -144,6 +144,23 @@ header h1 {
     transform: translateY(-2px);
 }
 
+.btn-danger {
+    background: var(--error-color);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(239, 68, 68, 0.4);
+}
+
+.wallet-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
 /* Form Elements */
 .form-group {
     display: flex;

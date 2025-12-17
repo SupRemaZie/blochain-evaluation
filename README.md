@@ -20,7 +20,7 @@ Une interface web moderne et intuitive est disponible dans le dossier `frontend/
 - **Workflow structuré** : 4 phases distinctes (REGISTER_CANDIDATES, FOUND_CANDIDATES, VOTE, COMPLETED)
 - **Financement des candidats** : Les founders peuvent financer les candidats pendant la phase FOUND_CANDIDATES
 - **Système de vote sécurisé** : Utilisation de NFTs pour prévenir le double vote
-- **Délai de vote** : Les votes ne peuvent commencer qu'1 heure après l'activation de la phase VOTE
+- **Délai de vote** : Les votes ne peuvent commencer qu'20 secondes après l'activation de la phase VOTE (configurable pour les tests)
 - **Détermination du vainqueur** : Fonction automatique pour identifier le candidat avec le plus de votes
 
 ## 🏗️ Architecture des Contrats
@@ -98,7 +98,7 @@ Les tests couvrent :
 - ✅ Transitions de workflow
 - ✅ Financement des candidats
 - ✅ Processus de vote complet
-- ✅ Restriction temporelle (1 heure)
+- ✅ Restriction temporelle (20 secondes pour les tests)
 - ✅ Prévention du double vote via NFT
 - ✅ Détermination du vainqueur
 - ✅ Tests de sécurité et cas limites
@@ -207,18 +207,19 @@ votingSystem.setWorkflowStatus(WorkflowStatus.COMPLETED)
 ## 🔗 Adresses des Contrats Déployés sur Sepolia
 
 ### VoteNFT
-- **Adresse** : `0xdb9fcDD0006f1EafDC54d289d4593175F23dDbbd`
-- **Etherscan** : [Voir sur Etherscan](https://sepolia.etherscan.io/address/0xdb9fcDD0006f1EafDC54d289d4593175F23dDbbd)
-- **Transaction de déploiement** : [Voir transaction](https://sepolia.etherscan.io/tx/0x969479a3efcefd5efbb106a7c626a1e3aa49c9d8b0b08471440093485be6c28a)
+- **Adresse** : `0x16e480d56DA571A689141C043e132AFDD1028ad6`
+- **Etherscan** : [Voir sur Etherscan](https://sepolia.etherscan.io/address/0x16e480d56DA571A689141C043e132AFDD1028ad6)
+- **Transaction de déploiement** : [Voir transaction](https://sepolia.etherscan.io/tx/0xfbccc7a61cfdb506ff7d11a91126fa42fce4bb2697c8cf26c26e75b8fe7d90d4)
 
 ### VotingSystem
-- **Adresse** : `0x11a88B3Ba383F46B014Fcfd9FFB4457AD5211BEb`
-- **Etherscan** : [Voir sur Etherscan](https://sepolia.etherscan.io/address/0x11a88B3Ba383F46B014Fcfd9FFB4457AD5211BEb)
-- **Transaction de déploiement** : [Voir transaction](https://sepolia.etherscan.io/tx/0x690bb564a0dadf8c8b6a1506ae9611622e047cd8d86e6572171a350298c69ad8)
+- **Adresse** : `0x338158D4663775b98952Ce4E159E83025cF60693`
+- **Etherscan** : [Voir sur Etherscan](https://sepolia.etherscan.io/address/0x338158D4663775b98952Ce4E159E83025cF60693)
+- **Transaction de déploiement** : [Voir transaction](https://sepolia.etherscan.io/tx/0x469f3f323c95cf437242d6268f39817a76dc5fa1aa5c6b08578a4f1418727213)
+- **⚠️ Nouvelle version avec délai de vote de 20 secondes** (au lieu de 1 heure)
 
 ### Déployeur (ADMIN)
 - **Adresse** : `0xD1EAFbE4d8145e1eab93002933a0F40aC674C5a0`
-- **Transaction de configuration** : [Voir transaction](https://sepolia.etherscan.io/tx/0xcb3acd84ef1cc19e99699d9d31a6f763d6e277f02c4fdf8149b3664849dd98c0)
+- **Transaction de configuration** : [Voir transaction](https://sepolia.etherscan.io/tx/0xc650f8ec962126dde151f973b5a73d22129bdc428d64000bf587a4227c715843)
 
 ## 📊 Transactions Importantes sur Sepolia
 

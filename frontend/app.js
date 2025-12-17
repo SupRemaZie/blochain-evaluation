@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Événements
     document.getElementById('connect-wallet').addEventListener('click', connectWallet);
+    document.getElementById('change-account')?.addEventListener('click', changeAccount);
     document.getElementById('register-candidate').addEventListener('click', registerCandidate);
     document.getElementById('set-workflow').addEventListener('click', setWorkflowStatus);
     document.getElementById('grant-founder').addEventListener('click', grantFounderRole);
@@ -97,6 +98,40 @@ async function connectWallet() {
     } catch (error) {
         console.error('Erreur de connexion:', error);
         showTransactionStatus('Erreur de connexion: ' + error.message, 'error');
+    }
+}
+
+// Changer de compte MetaMask
+async function changeAccount() {
+    try {
+        console.log('Changement de compte...');
+        // Méthode 1: Essayer wallet_requestPermissions (ouvre le sélecteur de compte)
+        try {
+            await window.ethereum.request({ 
+                method: 'wallet_requestPermissions',
+                params: [{ eth_accounts: {} }]
+            });
+            // Une fois le compte changé, MetaMask déclenchera l'événement 'accountsChanged'
+            // qui appellera automatiquement connectWallet() via le listener existant
+        } catch (permError) {
+            // Si wallet_requestPermissions n'est pas supporté ou annulé, utiliser eth_requestAccounts
+            if (permError.code === 4001) {
+                showTransactionStatus('Changement de compte annulé', 'error');
+                return;
+            }
+            
+            // Méthode 2: Utiliser eth_requestAccounts (ouvre aussi le sélecteur)
+            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            
+            if (accounts.length > 0) {
+                // Reconnecter avec le nouveau compte sélectionné
+                await connectWallet();
+                showTransactionStatus('Compte changé avec succès !', 'success');
+            }
+        }
+    } catch (error) {
+        console.error('Erreur lors du changement de compte:', error);
+        showTransactionStatus('Erreur lors du changement de compte: ' + error.message, 'error');
     }
 }
 
@@ -592,10 +627,61 @@ async function vote(candidateId) {
     }
 
     try {
+        // Vérifier d'abord les conditions avant d'envoyer la transaction
         const hasVoted = await voteNFT.hasVoted(userAddress);
         if (hasVoted) {
             alert('Vous avez déjà voté !');
             return;
+        }
+
+        // Vérifier le statut du workflow
+        const status = await votingSystem.workflowStatus();
+        if (Number(status) !== 2) {
+            alert('Le vote n\'est pas encore ouvert. Phase actuelle: ' + CONFIG.WORKFLOW_STATUS[Number(status)]);
+            return;
+        }
+
+        // Vérifier que le délai requis s'est écoulé
+        // Note: Le contrat peut utiliser 20s (nouveau) ou 3600s (ancien déploiement)
+        // On vérifie avec la valeur minimale pour être sûr
+        const voteStartTime = await votingSystem.voteStartTime();
+        const voteStartTimeNum = Number(voteStartTime);
+        const currentTime = Math.floor(Date.now() / 1000);
+        const timeElapsed = currentTime - voteStartTimeNum;
+        
+        console.log('Vérification du temps:', {
+            voteStartTime: voteStartTimeNum,
+            currentTime: currentTime,
+            timeElapsed: timeElapsed,
+            required: '20s (nouveau) ou 3600s (ancien déploiement)'
+        });
+        
+        if (voteStartTimeNum === 0) {
+            alert('La phase VOTE n\'a pas encore été activée. Le voteStartTime est 0.');
+            return;
+        }
+        
+        // Vérifier avec 20 secondes (nouveau contrat) mais aussi informer si c'est l'ancien
+        if (timeElapsed < 20) {
+            const remaining = 20 - timeElapsed;
+            alert(`Vous devez attendre encore ${remaining} seconde(s) avant de pouvoir voter. Temps écoulé: ${timeElapsed}s / 20s requis.`);
+            return;
+        }
+        
+        // Si le contrat déployé utilise encore 3600s, on ne peut pas le détecter ici
+        // mais on essaiera quand même et on gérera l'erreur
+
+        // Vérifier que le candidat existe (optionnel, le contrat le vérifiera aussi)
+        try {
+            const candidate = await votingSystem.getCandidate(candidateId);
+            // Le candidat existe si l'ID retourné correspond
+            if (candidate && Number(candidate[0]) !== Number(candidateId)) {
+                alert('Candidat invalide');
+                return;
+            }
+        } catch (e) {
+            // Si on ne peut pas récupérer le candidat, on laisse le contrat gérer l'erreur
+            console.warn('Impossible de vérifier le candidat:', e);
         }
 
         showTransactionStatus('Envoi du vote...', 'pending');
@@ -609,7 +695,47 @@ async function vote(candidateId) {
         await checkVotingStatus();
     } catch (error) {
         console.error('Erreur:', error);
-        showTransactionStatus('Erreur: ' + error.message, 'error');
+        let errorMessage = error.message;
+        
+        // Améliorer les messages d'erreur
+        const errorData = error.data || error.reason?.data || (error.reason && typeof error.reason === 'string' && error.reason.includes('0xc62abcd6') ? '0xc62abcd6' : null);
+        if (errorMessage.includes('VoteNotStarted') || errorMessage.includes('0xc62abcd6') || errorData === '0xc62abcd6' || (error.data && error.data.toString().includes('0xc62abcd6'))) {
+            // Récupérer les informations de temps pour afficher un message plus précis
+            try {
+                const voteStartTime = await votingSystem.voteStartTime();
+                const voteStartTimeNum = Number(voteStartTime);
+                const currentTime = Math.floor(Date.now() / 1000);
+                const timeElapsed = currentTime - voteStartTimeNum;
+                
+                if (voteStartTimeNum === 0) {
+                    errorMessage = 'La phase VOTE n\'a pas encore été activée. Veuillez activer la phase VOTE d\'abord.';
+                } else {
+                    // Le contrat déployé peut utiliser 3600s (ancien) ou 20s (nouveau)
+                    // On calcule pour les deux cas
+                    const remaining20 = Math.max(0, 20 - timeElapsed);
+                    const remaining3600 = Math.max(0, 3600 - timeElapsed);
+                    
+                    if (timeElapsed < 20) {
+                        errorMessage = `Le vote n'a pas encore commencé. Temps écoulé: ${timeElapsed}s / 20s requis. Il reste ${remaining20} seconde(s) à attendre.`;
+                    } else if (timeElapsed < 3600) {
+                        errorMessage = `Le contrat déployé utilise encore l'ancienne version (3600s). Temps écoulé: ${timeElapsed}s / 3600s requis. Il reste ${remaining3600} seconde(s) (${Math.floor(remaining3600/60)} minutes) à attendre. Veuillez redéployer le contrat avec la nouvelle version (20s) ou attendre.`;
+                    } else {
+                        errorMessage = `Le vote n'a pas encore commencé. Temps écoulé: ${timeElapsed}s.`;
+                    }
+                }
+            } catch (e) {
+                console.error('Erreur lors de la récupération des infos de temps:', e);
+                errorMessage = 'Le vote n\'a pas encore commencé. Le contrat déployé peut utiliser 3600s (ancien) ou 20s (nouveau). Vérifiez le temps écoulé depuis l\'activation de la phase VOTE.';
+            }
+        } else if (errorMessage.includes('AlreadyVoted')) {
+            errorMessage = 'Vous avez déjà voté !';
+        } else if (errorMessage.includes('InvalidCandidate')) {
+            errorMessage = 'Candidat invalide.';
+        } else if (errorMessage.includes('InvalidWorkflowStatus')) {
+            errorMessage = 'Le vote n\'est pas ouvert. Vérifiez le statut du workflow.';
+        }
+        
+        showTransactionStatus('Erreur: ' + errorMessage, 'error');
     }
 }
 
