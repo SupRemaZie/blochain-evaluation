@@ -10,13 +10,13 @@ const CONFIG = {
         "function workflowStatus() view returns (uint8)",
         "function voteStartTime() view returns (uint256)",
         "function getCandidateCount() view returns (uint256)",
-        "function getCandidate(uint256) view returns (uint256 id, string memory name, uint256 amountReceived, uint256 voteCount)",
+        "function getCandidate(uint256) view returns (uint256,string,uint256,uint256)",
         "function getAllCandidateIds() view returns (uint256[])",
         "function registerCandidate(string memory name)",
         "function setWorkflowStatus(uint8 newStatus)",
         "function fundCandidate(uint256 candidateId) payable",
         "function vote(uint256 candidateId)",
-        "function determineWinner() returns (uint256 candidateId, string memory name)",
+        "function determineWinner() returns (uint256, string)",
         "function hasRole(bytes32 role, address account) view returns (bool)",
         "function grantRole(bytes32 role, address account)",
         "function voteNFT() view returns (address)",
@@ -32,10 +32,10 @@ const CONFIG = {
         "function balanceOf(address owner) view returns (uint256)"
     ],
     
-    // Rôles (seront calculés dynamiquement)
+    // Rôles (seront calculés dynamiquement avec ethers v6)
     ROLES: {
-        ADMIN_ROLE: null, // Sera calculé avec ethers.utils.keccak256
-        FOUNDER_ROLE: null // Sera calculé avec ethers.utils.keccak256
+        ADMIN_ROLE: null, // Sera calculé avec ethers.id("ADMIN_ROLE")
+        FOUNDER_ROLE: null // Sera calculé avec ethers.id("FOUNDER_ROLE")
     },
     
     // Statuts du workflow

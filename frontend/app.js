@@ -3,17 +3,36 @@ let provider, signer, votingSystem, voteNFT;
 let userAddress = null;
 let userRoles = { admin: false, founder: false };
 
+// Attendre que ethers.js soit chargé
+function waitForEthers() {
+    return new Promise((resolve) => {
+        if (typeof ethers !== 'undefined') {
+            resolve();
+        } else {
+            const checkInterval = setInterval(() => {
+                if (typeof ethers !== 'undefined') {
+                    clearInterval(checkInterval);
+                    resolve();
+                }
+            }, 100);
+        }
+    });
+}
+
 // Initialisation
 document.addEventListener('DOMContentLoaded', async () => {
+    // Attendre que ethers.js soit chargé
+    await waitForEthers();
+    
     // Vérifier si MetaMask est installé
     if (typeof window.ethereum === 'undefined') {
         alert('MetaMask n\'est pas installé. Veuillez l\'installer pour utiliser cette application.');
         return;
     }
 
-    // Initialiser les rôles dans CONFIG
-    CONFIG.ROLES.ADMIN_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("ADMIN_ROLE"));
-    CONFIG.ROLES.FOUNDER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("FOUNDER_ROLE"));
+    // Initialiser les rôles dans CONFIG (ethers v6)
+    CONFIG.ROLES.ADMIN_ROLE = ethers.id("ADMIN_ROLE");
+    CONFIG.ROLES.FOUNDER_ROLE = ethers.id("FOUNDER_ROLE");
 
     // Événements
     document.getElementById('connect-wallet').addEventListener('click', connectWallet);
@@ -47,8 +66,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function connectWallet() {
     try {
         await window.ethereum.request({ method: 'eth_requestAccounts' });
-        provider = new ethers.providers.Web3Provider(window.ethereum);
-        signer = provider.getSigner();
+        provider = new ethers.BrowserProvider(window.ethereum);
+        signer = await provider.getSigner();
         userAddress = await signer.getAddress();
 
         // Initialiser les contrats
@@ -102,7 +121,7 @@ async function loadWalletInfo() {
     if (!provider || !userAddress) return;
 
     const balance = await provider.getBalance(userAddress);
-    const balanceEth = ethers.utils.formatEther(balance);
+    const balanceEth = ethers.formatEther(balance);
     document.getElementById('wallet-balance').textContent = parseFloat(balanceEth).toFixed(4);
 }
 
@@ -139,7 +158,7 @@ async function loadAllData() {
 // Charger le statut du workflow
 async function loadWorkflowStatus() {
     if (!provider) {
-        provider = new ethers.providers.Web3Provider(window.ethereum);
+        provider = new ethers.BrowserProvider(window.ethereum);
     }
 
     const contract = new ethers.Contract(
@@ -157,8 +176,8 @@ async function loadWorkflowStatus() {
         if (status == 2) {
             const voteStartTime = await contract.voteStartTime();
             const currentTime = Math.floor(Date.now() / 1000);
-            const oneHour = 3600;
-            const timeRemaining = voteStartTime.toNumber() + oneHour - currentTime;
+            const delaySeconds = 10; // 10 secondes pour les tests
+            const timeRemaining = Number(voteStartTime) + delaySeconds - currentTime;
 
             if (timeRemaining > 0) {
                 document.getElementById('vote-timer').style.display = 'block';
@@ -205,7 +224,7 @@ function startTimer(seconds) {
 // Charger les candidats
 async function loadCandidates() {
     if (!provider) {
-        provider = new ethers.providers.Web3Provider(window.ethereum);
+        provider = new ethers.BrowserProvider(window.ethereum);
     }
 
     const contract = new ethers.Contract(
@@ -224,7 +243,7 @@ async function loadCandidates() {
         fundSelect.innerHTML = '<option value="">Sélectionner un candidat</option>';
         voteOptions.innerHTML = '';
 
-        if (count.toNumber() === 0) {
+        if (Number(count) === 0) {
             candidatesList.innerHTML = '<p class="no-data">Aucun candidat enregistré</p>';
             return;
         }
@@ -234,28 +253,85 @@ async function loadCandidates() {
         const fundOptions = [];
         const voteOptionsHTML = [];
 
-        for (let i = 0; i < candidateIds.length; i++) {
-            const id = candidateIds[i];
-            const candidate = await contract.getCandidate(id);
+        // Dans ethers v6, les tableaux sont des objets, convertir en array
+        const idsArray = Array.isArray(candidateIds) ? candidateIds : Array.from(candidateIds);
+        
+        for (let i = 0; i < idsArray.length; i++) {
+            const id = idsArray[i];
+            // Décoder manuellement les données hex pour éviter les problèmes avec ethers v6
+            let candidateId, candidateName, amountReceived, voteCount;
+            try {
+                const iface = contract.interface;
+                const data = iface.encodeFunctionData("getCandidate", [id]);
+                const result = await provider.call({
+                    to: CONFIG.VOTING_SYSTEM_ADDRESS,
+                    data: data
+                });
+                
+                // Décoder manuellement avec AbiCoder
+                const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+                // Le format de retour est: (uint256, string, uint256, uint256)
+                // Mais les strings sont encodés avec un offset, donc on doit décoder différemment
+                
+                // Essayer de décoder avec l'interface
+                try {
+                    const decoded = iface.decodeFunctionResult("getCandidate", result);
+                    candidateId = decoded[0];
+                    candidateName = decoded[1];
+                    amountReceived = decoded[2];
+                    voteCount = decoded[3];
+                } catch (decodeError) {
+                    // Si le décodage automatique échoue, décoder manuellement
+                    // Format: offset (32 bytes), puis tuple avec id, string_offset, amount, votes
+                    const hexData = result.startsWith('0x') ? result.slice(2) : result;
+                    
+                    // Lire l'offset du tuple (premiers 32 bytes = 64 chars hex)
+                    const tupleOffset = parseInt(hexData.slice(0, 64), 16);
+                    
+                    // Les données du tuple commencent à l'offset (en bytes, donc *2 pour chars hex)
+                    const tupleStart = tupleOffset * 2;
+                    
+                    // Lire id (32 bytes = 64 chars hex)
+                    candidateId = BigInt("0x" + hexData.slice(tupleStart, tupleStart + 64));
+                    
+                    // Lire string offset (32 bytes)
+                    const stringOffset = parseInt(hexData.slice(tupleStart + 64, tupleStart + 128), 16);
+                    
+                    // Lire amountReceived (32 bytes)
+                    amountReceived = BigInt("0x" + hexData.slice(tupleStart + 128, tupleStart + 192));
+                    
+                    // Lire voteCount (32 bytes)
+                    voteCount = BigInt("0x" + hexData.slice(tupleStart + 192, tupleStart + 256));
+                    
+                    // Décoder le string (commence à l'offset indiqué, en bytes donc *2)
+                    const stringDataStart = stringOffset * 2;
+                    const stringLength = parseInt(hexData.slice(stringDataStart, stringDataStart + 64), 16);
+                    const stringHex = hexData.slice(stringDataStart + 64, stringDataStart + 64 + stringLength * 2);
+                    candidateName = ethers.toUtf8String("0x" + stringHex);
+                }
+            } catch (error) {
+                console.error(`Erreur lors de la récupération du candidat ${id}:`, error);
+                continue;
+            }
             
             const candidateCard = `
                 <div class="candidate-card">
-                    <h3>${candidate.name}</h3>
+                    <h3>${candidateName}</h3>
                     <div class="candidate-info">
-                        <p><strong>ID:</strong> ${candidate.id.toString()}</p>
-                        <p><strong>Financement:</strong> ${ethers.utils.formatEther(candidate.amountReceived)} ETH</p>
-                        <p><strong>Votes:</strong> ${candidate.voteCount.toString()}</p>
+                        <p><strong>ID:</strong> ${candidateId.toString()}</p>
+                        <p><strong>Financement:</strong> ${ethers.formatEther(amountReceived)} ETH</p>
+                        <p><strong>Votes:</strong> ${voteCount.toString()}</p>
                     </div>
                 </div>
             `;
             candidatesHTML.push(candidateCard);
 
-            const option = `<option value="${candidate.id}">${candidate.name}</option>`;
+            const option = `<option value="${candidateId}">${candidateName}</option>`;
             fundOptions.push(option);
 
             const voteOption = `
-                <button class="vote-btn" onclick="vote(${candidate.id})">
-                    Voter pour ${candidate.name}
+                <button class="vote-btn" onclick="vote(${candidateId})">
+                    Voter pour ${candidateName}
                 </button>
             `;
             voteOptionsHTML.push(voteOption);
@@ -303,6 +379,13 @@ async function registerCandidate() {
     }
 
     try {
+        // Vérifier d'abord le statut du workflow
+        const status = await votingSystem.workflowStatus();
+        if (Number(status) !== 0) {
+            alert('Vous devez être en phase REGISTER_CANDIDATES pour enregistrer un candidat. Phase actuelle: ' + CONFIG.WORKFLOW_STATUS[Number(status)]);
+            return;
+        }
+
         showTransactionStatus('Enregistrement du candidat...', 'pending');
         const tx = await votingSystem.registerCandidate(name);
         showTransactionStatus('Transaction envoyée, attente de confirmation...', 'pending', tx.hash);
@@ -314,7 +397,16 @@ async function registerCandidate() {
         await loadCandidates();
     } catch (error) {
         console.error('Erreur:', error);
-        showTransactionStatus('Erreur: ' + error.message, 'error');
+        let errorMessage = error.message;
+        
+        // Améliorer les messages d'erreur
+        if (errorMessage.includes('InvalidWorkflowStatus') || errorMessage.includes('0x0e10df3f')) {
+            errorMessage = 'Vous devez être en phase REGISTER_CANDIDATES pour enregistrer un candidat.';
+        } else if (errorMessage.includes('AccessControl')) {
+            errorMessage = 'Vous devez être ADMIN pour enregistrer un candidat.';
+        }
+        
+        showTransactionStatus('Erreur: ' + errorMessage, 'error');
     }
 }
 
@@ -350,7 +442,7 @@ async function grantFounderRole() {
     }
 
     const address = document.getElementById('founder-address').value.trim();
-    if (!ethers.utils.isAddress(address)) {
+    if (!ethers.isAddress(address)) {
         alert('Adresse invalide');
         return;
     }
@@ -386,7 +478,7 @@ async function fundCandidate() {
     }
 
     try {
-        const amountWei = ethers.utils.parseEther(amount);
+        const amountWei = ethers.parseEther(amount);
         showTransactionStatus('Financement du candidat...', 'pending');
         const tx = await votingSystem.fundCandidate(candidateId, { value: amountWei });
         showTransactionStatus('Transaction envoyée...', 'pending', tx.hash);
@@ -434,7 +526,7 @@ async function vote(candidateId) {
 // Déterminer le vainqueur
 async function determineWinner() {
     if (!provider) {
-        provider = new ethers.providers.Web3Provider(window.ethereum);
+        provider = new ethers.BrowserProvider(window.ethereum);
     }
 
     const contract = new ethers.Contract(
@@ -448,22 +540,35 @@ async function determineWinner() {
         const tx = await contract.determineWinner();
         showTransactionStatus('Transaction envoyée...', 'pending', tx.hash);
         
+        // Dans ethers v6, determineWinner() retourne directement les valeurs
+        // On peut aussi parser les logs si nécessaire
         const receipt = await tx.wait();
         
-        // Récupérer l'événement WinnerDetermined
-        const event = receipt.events.find(e => e.event === 'WinnerDetermined');
-        if (event) {
-            const winnerId = event.args.candidateId;
-            const winnerName = event.args.name;
-            const voteCount = event.args.voteCount;
-            
-            document.getElementById('winner-info').innerHTML = `
-                <div class="winner-card">
-                    <h3>🏆 ${winnerName}</h3>
-                    <p><strong>ID:</strong> ${winnerId.toString()}</p>
-                    <p><strong>Votes:</strong> ${voteCount.toString()}</p>
-                </div>
-            `;
+        // Dans ethers v6, determineWinner() retourne directement un tuple [candidateId, name]
+        // Mais comme c'est une transaction, on doit parser les logs pour l'événement
+        const iface = contract.interface;
+        for (const log of receipt.logs) {
+            try {
+                const parsedLog = iface.parseLog(log);
+                if (parsedLog && parsedLog.name === 'WinnerDetermined') {
+                    // Dans ethers v6, les args sont accessibles par index ou nom
+                    const winnerId = parsedLog.args[0] || parsedLog.args.candidateId;
+                    const winnerName = parsedLog.args[1] || parsedLog.args.name;
+                    const voteCount = parsedLog.args[2] || parsedLog.args.voteCount;
+                    
+                    document.getElementById('winner-info').innerHTML = `
+                        <div class="winner-card">
+                            <h3>🏆 ${winnerName}</h3>
+                            <p><strong>ID:</strong> ${winnerId.toString()}</p>
+                            <p><strong>Votes:</strong> ${voteCount.toString()}</p>
+                        </div>
+                    `;
+                    break;
+                }
+            } catch (e) {
+                // Ce log n'appartient pas à ce contrat
+                console.log('Log parsing error:', e);
+            }
         }
         
         showTransactionStatus('Vainqueur déterminé avec succès !', 'success', tx.hash);
