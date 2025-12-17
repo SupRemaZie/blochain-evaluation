@@ -367,6 +367,490 @@ Si vous êtes le déployeur (ADMIN), vous devez configurer le système :
 - Vérifiez que vous êtes sur le réseau Sepolia
 - Rafraîchissez la page et réessayez
 
+## 🔄 Workflow Frontend/Backend
+
+Cette section détaille l'architecture et le flux de communication entre l'interface web (frontend) et les smart contracts (backend).
+
+### Architecture Générale
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    FRONTEND (Interface Web)                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   HTML/CSS   │  │  JavaScript  │  │  Ethers.js    │      │
+│  │  (UI/UX)     │  │  (Logique)   │  │  (SDK)       │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+└───────────────────────────┬─────────────────────────────────┘
+                             │
+                             │ RPC Calls / Transactions
+                             │
+┌─────────────────────────────┴─────────────────────────────────┐
+│              BACKEND (Smart Contracts)                        │
+│  ┌──────────────────────┐  ┌──────────────────────┐          │
+│  │   VotingSystem.sol   │  │    VoteNFT.sol       │          │
+│  │  (Contrat Principal) │  │  (Contrat NFT)       │          │
+│  └──────────────────────┘  └──────────────────────┘          │
+└─────────────────────────────┬─────────────────────────────────┘
+                               │
+                               │ Blockchain Events
+                               │
+                    ┌──────────┴──────────┐
+                    │   Sepolia Network   │
+                    │   (Ethereum Testnet)│
+                    └─────────────────────┘
+```
+
+### Composants Frontend
+
+#### 1. **Interface Utilisateur (HTML/CSS)**
+- **Fichier** : `frontend/index.html`, `frontend/styles.css`
+- **Rôle** : Présentation visuelle, formulaires, affichage des données
+- **Sections principales** :
+  - Connexion Wallet
+  - Statut du Workflow
+  - Administration (ADMIN)
+  - Financement (FOUNDER)
+  - Candidats
+  - Vote
+  - Vainqueur
+
+#### 2. **Logique Métier (JavaScript)**
+- **Fichier** : `frontend/app.js`
+- **Rôle** : Gestion des interactions, validation, appel des contrats
+- **Fonctions principales** :
+  - `connectWallet()` : Connexion MetaMask
+  - `checkUserRoles()` : Vérification des rôles
+  - `registerCandidate()` : Enregistrement candidat
+  - `fundCandidate()` : Financement candidat
+  - `vote()` : Vote pour un candidat
+  - `determineWinner()` : Détermination du vainqueur
+
+#### 3. **Configuration (Config)**
+- **Fichier** : `frontend/config.js`
+- **Rôle** : Configuration des adresses de contrats, ABIs, constantes
+- **Contenu** :
+  - Adresses des contrats déployés
+  - ABIs (Application Binary Interfaces)
+  - Mapping des rôles et statuts
+
+### Composants Backend
+
+#### 1. **VotingSystem.sol**
+- **Rôle** : Contrat principal gérant tout le processus de vote
+- **Fonctions principales** :
+  - Gestion des candidats
+  - Gestion du workflow
+  - Financement
+  - Vote
+  - Détermination du vainqueur
+
+#### 2. **VoteNFT.sol**
+- **Rôle** : Contrat ERC721 pour les NFTs de vote
+- **Fonctions principales** :
+  - Mint de NFT (uniquement par VotingSystem)
+  - Vérification si un votant a déjà voté
+
+### Flux de Communication
+
+#### 1. **Initialisation**
+
+```
+Frontend                    Backend
+   │                           │
+   │─── eth_requestAccounts ───>│  (MetaMask)
+   │<── accounts[] ────────────│
+   │                           │
+   │─── new BrowserProvider ───>│  (Ethers.js)
+   │                           │
+   │─── new Contract() ────────>│  (VotingSystem)
+   │─── new Contract() ────────>│  (VoteNFT)
+   │                           │
+   │─── hasRole(ADMIN_ROLE) ───>│
+   │<── true/false ────────────│
+   │                           │
+   │─── workflowStatus() ──────>│
+   │<── uint8 status ───────────│
+   │                           │
+   │─── getAllCandidateIds() ──>│
+   │<── uint256[] ids ──────────│
+```
+
+#### 2. **Cycle de Vie d'une Transaction**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 1. UTILISATEUR CLIQUE SUR UN BOUTON                        │
+│    Ex: "Enregistrer Candidat"                              │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 2. VALIDATION FRONTEND                                      │
+│    - Vérification des rôles (checkUserRoles)               │
+│    - Vérification du workflow status                       │
+│    - Validation des données d'entrée                        │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 3. APPEL DE FONCTION CONTRACT                              │
+│    const tx = await votingSystem.registerCandidate(name)   │
+│    - Estimation du gas                                     │
+│    - Création de la transaction                            │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 4. METAMASK POPUP                                           │
+│    - Affichage de la transaction                           │
+│    - Demande de confirmation utilisateur                    │
+│    - Signature de la transaction                          │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 5. BROADCAST SUR LA BLOCKCHAIN                              │
+│    - Transaction envoyée au réseau Sepolia                 │
+│    - Attente de la confirmation (tx.wait())                 │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 6. ÉVÉNEMENT ÉMIS PAR LE CONTRAT                           │
+│    event CandidateRegistered(uint256 candidateId, ...)     │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 7. MISE À JOUR DE L'INTERFACE                              │
+│    - Rechargement des candidats (loadCandidates)            │
+│    - Affichage du statut de transaction                     │
+│    - Lien Etherscan affiché                                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Interactions Détaillées par Fonctionnalité
+
+#### Enregistrement d'un Candidat
+
+```javascript
+// Frontend (app.js)
+async function registerCandidate() {
+    // 1. Vérification du rôle ADMIN
+    if (!userRoles.admin) { ... }
+    
+    // 2. Récupération du nom
+    const name = document.getElementById('candidate-name').value;
+    
+    // 3. Appel du contrat
+    const tx = await votingSystem.registerCandidate(name);
+    
+    // 4. Attente de confirmation
+    await tx.wait();
+    
+    // 5. Rechargement des données
+    await loadCandidates();
+}
+```
+
+```solidity
+// Backend (VotingSystem.sol)
+function registerCandidate(string memory name) 
+    external 
+    onlyRole(ADMIN_ROLE) 
+    onlyWorkflowStatus(WorkflowStatus.REGISTER_CANDIDATES) 
+{
+    // 1. Validation
+    // 2. Création du candidat
+    // 3. Émission d'événement
+    emit CandidateRegistered(candidateId, name);
+}
+```
+
+#### Financement d'un Candidat
+
+```javascript
+// Frontend
+async function fundCandidate() {
+    // 1. Vérification du rôle FOUNDER
+    // 2. Récupération du candidat et montant
+    const candidateId = parseInt(document.getElementById('fund-candidate-select').value);
+    const amount = ethers.parseEther(document.getElementById('fund-amount').value);
+    
+    // 3. Appel avec valeur ETH
+    const tx = await votingSystem.fundCandidate(candidateId, { value: amount });
+    
+    // 4. Attente et rechargement
+    await tx.wait();
+    await loadCandidates();
+}
+```
+
+```solidity
+// Backend
+function fundCandidate(uint256 candidateId) 
+    external 
+    payable 
+    onlyRole(FOUNDER_ROLE) 
+    onlyWorkflowStatus(WorkflowStatus.FOUND_CANDIDATES) 
+{
+    // 1. Validation
+    // 2. Mise à jour du montant reçu
+    candidates[candidateId].amountReceived += msg.value;
+    
+    // 3. Émission d'événement
+    emit CandidateFunded(candidateId, msg.sender, msg.value);
+}
+```
+
+#### Vote
+
+```javascript
+// Frontend
+async function vote(candidateId) {
+    // 1. Vérifications préalables
+    const hasVoted = await voteNFT.hasVoted(userAddress);
+    const status = await votingSystem.workflowStatus();
+    const voteStartTime = await votingSystem.voteStartTime();
+    const timeElapsed = currentTime - Number(voteStartTime);
+    
+    // 2. Vérification du délai (20 secondes)
+    if (timeElapsed < 20) { ... }
+    
+    // 3. Appel du contrat
+    const tx = await votingSystem.vote(candidateId);
+    
+    // 4. Le contrat mint automatiquement un NFT
+    // 5. Rechargement des données
+}
+```
+
+```solidity
+// Backend
+function vote(uint256 candidateId) external onlyWorkflowStatus(WorkflowStatus.VOTE) {
+    // 1. Vérification du délai (20 secondes)
+    if (block.timestamp < voteStartTime + ONE_HOUR) { revert VoteNotStarted(); }
+    
+    // 2. Vérification si déjà voté
+    if (voteNFT.hasVoted(msg.sender)) { revert AlreadyVoted(msg.sender); }
+    
+    // 3. Mint du NFT
+    voteNFT.mint(msg.sender);
+    
+    // 4. Incrémentation des votes
+    candidates[candidateId].voteCount++;
+    
+    // 5. Émission d'événement
+    emit Voted(msg.sender, candidateId);
+}
+```
+
+### Événements et Synchronisation
+
+#### Événements Émis par les Contrats
+
+| Événement | Contrat | Déclencheur | Données |
+|-----------|---------|-------------|---------|
+| `CandidateRegistered` | VotingSystem | Enregistrement candidat | `candidateId`, `name` |
+| `WorkflowStatusChanged` | VotingSystem | Changement de phase | `oldStatus`, `newStatus` |
+| `CandidateFunded` | VotingSystem | Financement | `candidateId`, `founder`, `amount` |
+| `Voted` | VotingSystem | Vote | `voter`, `candidateId` |
+| `WinnerDetermined` | VotingSystem | Détermination vainqueur | `candidateId`, `name`, `voteCount` |
+
+#### Synchronisation Frontend
+
+Le frontend synchronise les données de plusieurs façons :
+
+1. **Lecture directe** : Appels `view` pour récupérer l'état actuel
+   ```javascript
+   const status = await votingSystem.workflowStatus();
+   const candidates = await votingSystem.getAllCandidateIds();
+   ```
+
+2. **Rechargement après transaction** : Après chaque transaction réussie
+   ```javascript
+   await tx.wait();
+   await loadCandidates(); // Rechargement complet
+   ```
+
+3. **Écoute des changements de compte** : Détection automatique
+   ```javascript
+   window.ethereum.on('accountsChanged', async (accounts) => {
+       await connectWallet(); // Reconnexion automatique
+   });
+   ```
+
+4. **Parsing des événements** : Extraction depuis les receipts
+   ```javascript
+   const receipt = await tx.wait();
+   const parsedLog = iface.parseLog(log);
+   if (parsedLog.name === 'WinnerDetermined') {
+       // Affichage du vainqueur
+   }
+   ```
+
+### Gestion des Rôles
+
+#### Vérification des Rôles (Frontend)
+
+```javascript
+// Calcul des hash de rôles (ethers v6)
+CONFIG.ROLES.ADMIN_ROLE = ethers.id("ADMIN_ROLE");
+CONFIG.ROLES.FOUNDER_ROLE = ethers.id("FOUNDER_ROLE");
+
+// Vérification
+const isAdmin = await votingSystem.hasRole(CONFIG.ROLES.ADMIN_ROLE, userAddress);
+const isFounder = await votingSystem.hasRole(CONFIG.ROLES.FOUNDER_ROLE, userAddress);
+```
+
+#### Attribution des Rôles (Backend)
+
+```solidity
+// Le déployeur est automatiquement ADMIN
+constructor(address _voteNFT) {
+    _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    _grantRole(ADMIN_ROLE, msg.sender);
+}
+
+// Les ADMIN peuvent attribuer FOUNDER_ROLE
+function grantFounderRole(address founder) external onlyRole(ADMIN_ROLE) {
+    _grantRole(FOUNDER_ROLE, founder);
+}
+```
+
+### Gestion du Workflow
+
+#### États du Workflow
+
+```
+REGISTER_CANDIDATES (0)
+    │
+    │ setWorkflowStatus(1)
+    ▼
+FOUND_CANDIDATES (1)
+    │
+    │ setWorkflowStatus(2)
+    ▼
+VOTE (2)
+    │
+    │ (attente 20 secondes)
+    │
+    │ vote() disponible
+    │
+    │ setWorkflowStatus(3)
+    ▼
+COMPLETED (3)
+    │
+    │ determineWinner()
+    ▼
+Vainqueur déterminé
+```
+
+#### Vérifications Frontend/Backend
+
+**Frontend** : Vérifications préalables pour améliorer l'UX
+```javascript
+// Vérification avant d'envoyer la transaction
+if (Number(status) !== 2) {
+    alert('Le vote n\'est pas encore ouvert');
+    return;
+}
+```
+
+**Backend** : Vérifications de sécurité (modifiers)
+```solidity
+modifier onlyWorkflowStatus(WorkflowStatus _status) {
+    if (workflowStatus != _status) {
+        revert InvalidWorkflowStatus(_status, workflowStatus);
+    }
+    _;
+}
+```
+
+### Gestion des Erreurs
+
+#### Types d'Erreurs
+
+1. **Erreurs de validation frontend** : Affichées immédiatement
+   ```javascript
+   if (!userRoles.admin) {
+       alert('Vous devez être ADMIN');
+       return;
+   }
+   ```
+
+2. **Erreurs de transaction** : Capturées et affichées
+   ```javascript
+   try {
+       const tx = await votingSystem.vote(candidateId);
+   } catch (error) {
+       // Décodage des erreurs custom
+       if (error.data === '0xc62abcd6') {
+           errorMessage = 'Le vote n\'a pas encore commencé';
+       }
+   }
+   ```
+
+3. **Erreurs de contrat** : Custom errors avec messages clairs
+   ```solidity
+   error VoteNotStarted();
+   error AlreadyVoted(address voter);
+   error InvalidWorkflowStatus(WorkflowStatus required, WorkflowStatus current);
+   ```
+
+### Sécurité Frontend/Backend
+
+#### Frontend
+- ✅ Validation des données avant envoi
+- ✅ Vérification des rôles avant affichage des actions
+- ✅ Gestion des erreurs avec messages clairs
+- ✅ Vérification du délai avant vote
+
+#### Backend
+- ✅ Modifiers pour les rôles et phases
+- ✅ Custom errors pour messages clairs
+- ✅ Checks-Effects-Interactions pattern
+- ✅ Vérifications de sécurité multiples
+
+### Flux de Données Complet
+
+```
+┌─────────────┐
+│  Utilisateur│
+└──────┬──────┘
+       │
+       ▼
+┌─────────────────┐
+│  Interface Web  │
+│  (HTML/CSS/JS)  │
+└──────┬──────────┘
+       │
+       │ Ethers.js
+       │
+       ▼
+┌─────────────────┐
+│  MetaMask       │
+│  (Provider)     │
+└──────┬──────────┘
+       │
+       │ RPC Calls
+       │
+       ▼
+┌─────────────────┐
+│  Sepolia Network│
+│  (Blockchain)    │
+└──────┬──────────┘
+       │
+       │ Transactions
+       │
+       ▼
+┌─────────────────┐
+│  Smart Contracts│
+│  (VotingSystem) │
+│  (VoteNFT)      │
+└─────────────────┘
+```
+
 ## 🔗 Adresses des Contrats Déployés sur Sepolia
 
 ### VoteNFT
