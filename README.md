@@ -8,7 +8,9 @@ Ce projet implémente un système de vote décentralisé avec les fonctionnalit�
 
 ### 🌐 Interface Web Incluse
 
-Une interface web moderne et intuitive est disponible dans le dossier `frontend/` pour interagir facilement avec le système :
+Une interface web moderne et intuitive est disponible dans le dossier `frontend/` pour interagir facilement avec le système en demarrant le serveur avec la commande : ```bash
+python3 -m http.server 8000
+```
 - Connexion MetaMask
 - Visualisation des candidats en temps réel
 - Actions selon les rôles (ADMIN, FOUNDER, VOTANT)
