@@ -276,8 +276,8 @@ contract VotingSystemTest is Test {
         vm.prank(admin);
         votingSystem.setWorkflowStatus(VotingSystem.WorkflowStatus.VOTE);
         
-        // Avancer le temps de 1 heure
-        vm.warp(block.timestamp + 3601);
+        // Avancer le temps de 20 secondes
+        vm.warp(block.timestamp + 21);
         
         // Voter
         vm.prank(voter1);
@@ -295,7 +295,7 @@ contract VotingSystemTest is Test {
         vm.prank(admin);
         votingSystem.setWorkflowStatus(VotingSystem.WorkflowStatus.VOTE);
         
-        vm.warp(block.timestamp + 3601);
+        vm.warp(block.timestamp + 21);
         
         vm.prank(voter1);
         vm.expectEmit(true, true, false, false);
@@ -312,7 +312,7 @@ contract VotingSystemTest is Test {
         vm.prank(admin);
         votingSystem.setWorkflowStatus(VotingSystem.WorkflowStatus.VOTE);
         
-        vm.warp(block.timestamp + 3601);
+        vm.warp(block.timestamp + 21);
         
         vm.prank(voter1);
         votingSystem.vote(1);
@@ -348,18 +348,18 @@ contract VotingSystemTest is Test {
         votingSystem.setWorkflowStatus(VotingSystem.WorkflowStatus.VOTE);
         uint256 voteStartTime = votingSystem.voteStartTime();
         
-        // Avancer de 3599 secondes (moins d'1 heure)
-        vm.warp(voteStartTime + 3599);
+        // Avancer de 19 secondes (moins de 20 secondes)
+        vm.warp(voteStartTime + 19);
         
-        // Moins d'1 heure ne suffit pas
+        // Moins de 20 secondes ne suffit pas
         vm.prank(voter1);
         vm.expectRevert();
         votingSystem.vote(1);
         
-        // Avancer à exactement 1 heure (3600 secondes)
-        // La condition est block.timestamp < voteStartTime + ONE_HOUR
-        // Donc à 3600, block.timestamp n'est pas < voteStartTime + 3600, donc ça fonctionne
-        vm.warp(voteStartTime + 3600);
+        // Avancer à exactement 20 secondes
+        // La condition est block.timestamp < voteStartTime + ONE_HOUR (20 secondes)
+        // Donc à 20, block.timestamp n'est pas < voteStartTime + 20, donc ça fonctionne
+        vm.warp(voteStartTime + 20);
         
         // Maintenant ça devrait fonctionner
         vm.prank(voter1);
@@ -375,7 +375,7 @@ contract VotingSystemTest is Test {
         vm.prank(admin);
         votingSystem.setWorkflowStatus(VotingSystem.WorkflowStatus.VOTE);
         
-        vm.warp(block.timestamp + 3601);
+        vm.warp(block.timestamp + 21);
         
         vm.prank(voter1);
         votingSystem.vote(1);
@@ -400,7 +400,7 @@ contract VotingSystemTest is Test {
         vm.prank(admin);
         votingSystem.setWorkflowStatus(VotingSystem.WorkflowStatus.VOTE);
         
-        vm.warp(block.timestamp + 3601);
+        vm.warp(block.timestamp + 21);
         
         vm.prank(voter1);
         vm.expectRevert();
@@ -414,7 +414,7 @@ contract VotingSystemTest is Test {
         vm.prank(admin);
         votingSystem.setWorkflowStatus(VotingSystem.WorkflowStatus.VOTE);
         
-        vm.warp(block.timestamp + 3601);
+        vm.warp(block.timestamp + 21);
         
         vm.prank(voter1);
         votingSystem.vote(1);
@@ -437,7 +437,7 @@ contract VotingSystemTest is Test {
         vm.prank(admin);
         votingSystem.setWorkflowStatus(VotingSystem.WorkflowStatus.VOTE);
         
-        vm.warp(block.timestamp + 3601);
+        vm.warp(block.timestamp + 21);
         
         // Votes : Alice = 2, Bob = 1, Charlie = 0
         vm.prank(voter1);
@@ -465,7 +465,7 @@ contract VotingSystemTest is Test {
         vm.prank(admin);
         votingSystem.setWorkflowStatus(VotingSystem.WorkflowStatus.VOTE);
         
-        vm.warp(block.timestamp + 3601);
+        vm.warp(block.timestamp + 21);
         
         vm.prank(voter1);
         votingSystem.vote(1);
@@ -498,7 +498,7 @@ contract VotingSystemTest is Test {
         vm.prank(admin);
         votingSystem.setWorkflowStatus(VotingSystem.WorkflowStatus.VOTE);
         
-        vm.warp(block.timestamp + 3601);
+        vm.warp(block.timestamp + 21);
         
         vm.prank(voter1);
         votingSystem.vote(1);
@@ -578,8 +578,8 @@ contract VotingSystemTest is Test {
         vm.prank(admin);
         votingSystem.setWorkflowStatus(VotingSystem.WorkflowStatus.VOTE);
         
-        // 4. Attendre 1 heure et voter
-        vm.warp(block.timestamp + 3601);
+        // 4. Attendre 20 secondes et voter
+        vm.warp(block.timestamp + 21);
         
         vm.prank(voter1);
         votingSystem.vote(1);
