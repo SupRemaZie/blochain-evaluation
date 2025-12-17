@@ -14,8 +14,6 @@ Une interface web moderne et intuitive est disponible dans le dossier `frontend/
 - Actions selon les rôles (ADMIN, FOUNDER, VOTANT)
 - Design moderne et responsive
 
-**Voir [frontend/README.md](frontend/README.md) pour plus d'informations.**
-
 - **Gestion des rôles** : Système de rôles basé sur OpenZeppelin AccessControl (ADMIN, FOUNDER, VOTANT)
 - **Workflow structuré** : 4 phases distinctes (REGISTER_CANDIDATES, FOUND_CANDIDATES, VOTE, COMPLETED)
 - **Financement des candidats** : Les founders peuvent financer les candidats pendant la phase FOUND_CANDIDATES
@@ -204,6 +202,171 @@ votingSystem.setWorkflowStatus(WorkflowStatus.COMPLETED)
 (uint256 winnerId, string memory winnerName) = votingSystem.determineWinner()
 ```
 
+## 🌐 Guide d'Utilisation de l'Interface Web
+
+Cette section explique comment utiliser l'interface web pour gérer le système de vote de bout en bout.
+
+### Prérequis
+
+1. **MetaMask installé** : Assurez-vous d'avoir l'extension MetaMask installée dans votre navigateur
+2. **Réseau Sepolia** : Configurez MetaMask pour utiliser le réseau de test Sepolia
+3. **ETH Sepolia** : Ayez suffisamment d'ETH Sepolia pour payer les frais de transaction (obtenez-en sur un [faucet Sepolia](https://sepoliafaucet.com/))
+4. **Adresses des contrats** : Mettez à jour `frontend/config.js` avec les adresses des contrats déployés
+
+### Accès à l'Interface
+
+1. Ouvrez le fichier `frontend/index.html` dans votre navigateur
+   - Vous pouvez utiliser un serveur local (ex: `python -m http.server 8000` dans le dossier `frontend/`)
+   - Ou ouvrez directement le fichier HTML
+
+### Étape 1 : Connexion MetaMask
+
+1. **Cliquez sur "Connecter MetaMask"**
+   - Une popup MetaMask s'ouvrira
+   - Sélectionnez le compte que vous souhaitez utiliser
+   - Approuvez la connexion
+
+2. **Vérification de la connexion**
+   - Votre adresse s'affiche dans la section "Connexion Wallet"
+   - Le solde ETH est affiché
+   - Les rôles attribués à votre compte sont indiqués
+
+3. **Changer de compte** (optionnel)
+   - Cliquez sur "Changer de compte" pour sélectionner un autre compte MetaMask
+
+### Étape 2 : Configuration Initiale (ADMIN uniquement)
+
+Si vous êtes le déployeur (ADMIN), vous devez configurer le système :
+
+#### 2.1 Attribuer le rôle FOUNDER
+
+1. Dans la section "Administration", trouvez "Attribuer le rôle FOUNDER"
+2. Entrez l'adresse du compte qui doit recevoir le rôle FOUNDER
+3. Cliquez sur "Attribuer"
+4. Confirmez la transaction dans MetaMask
+5. Attendez la confirmation (un lien Etherscan s'affichera)
+
+#### 2.2 Enregistrer les candidats
+
+1. Assurez-vous que le workflow est en phase **REGISTER_CANDIDATES** (vérifiez dans "Statut du Workflow")
+2. Dans la section "Administration", trouvez "Enregistrer un Candidat"
+3. Entrez le nom du candidat (ex: "Alice", "Bob")
+4. Cliquez sur "Enregistrer"
+5. Confirmez la transaction dans MetaMask
+6. Répétez pour chaque candidat
+7. Les candidats apparaîtront dans la section "Candidats"
+
+### Étape 3 : Phase de Financement (FOUNDER uniquement)
+
+#### 3.1 Passer à la phase FOUND_CANDIDATES
+
+1. **En tant qu'ADMIN**, dans la section "Administration"
+2. Sélectionnez "FOUND_CANDIDATES" dans le menu déroulant "Changer le Statut du Workflow"
+3. Cliquez sur "Changer"
+4. Confirmez la transaction dans MetaMask
+
+#### 3.2 Financer un candidat
+
+1. **En tant que FOUNDER**, la section "Financement" devient visible
+2. Sélectionnez un candidat dans le menu déroulant
+3. Entrez le montant en ETH à envoyer (ex: 0.1, 0.5, 1.0)
+4. Cliquez sur "Financer"
+5. Confirmez la transaction dans MetaMask
+6. Le financement sera visible dans les informations du candidat
+
+**Note** : Vous pouvez financer plusieurs candidats ou le même candidat plusieurs fois.
+
+### Étape 4 : Phase de Vote
+
+#### 4.1 Activer la phase VOTE
+
+1. **En tant qu'ADMIN**, dans la section "Administration"
+2. Sélectionnez "VOTE" dans le menu déroulant "Changer le Statut du Workflow"
+3. Cliquez sur "Changer"
+4. Confirmez la transaction dans MetaMask
+5. **Important** : Un timer de 20 secondes démarre. Les votes ne seront possibles qu'après ce délai.
+
+#### 4.2 Voter pour un candidat
+
+1. **Attendez 20 secondes** après l'activation de la phase VOTE
+   - Un compte à rebours s'affiche dans "Statut du Workflow"
+   - Le message "Temps avant vote" indique le temps restant
+
+2. Une fois le délai écoulé, la section "Vote" devient visible
+
+3. Cliquez sur le bouton "Voter pour [Nom du candidat]" du candidat de votre choix
+
+4. Confirmez la transaction dans MetaMask
+
+5. **Important** : 
+   - Vous ne pouvez voter qu'une seule fois
+   - Un NFT de vote vous sera automatiquement attribué
+   - Le message "✅ Vous avez déjà voté !" s'affichera après votre vote
+
+6. Les résultats sont mis à jour en temps réel dans la section "Candidats"
+
+### Étape 5 : Détermination du Vainqueur
+
+#### 5.1 Terminer la phase de vote
+
+1. **En tant qu'ADMIN**, dans la section "Administration"
+2. Sélectionnez "COMPLETED" dans le menu déroulant "Changer le Statut du Workflow"
+3. Cliquez sur "Changer"
+4. Confirmez la transaction dans MetaMask
+
+#### 5.2 Déterminer le vainqueur
+
+1. La section "Vainqueur" devient visible
+2. Cliquez sur "Déterminer le Vainqueur"
+3. Confirmez la transaction dans MetaMask
+4. Le vainqueur s'affiche avec :
+   - Son ID
+   - Son nom
+   - Son nombre de votes
+
+### Fonctionnalités Supplémentaires
+
+#### Actualiser les données
+
+- Cliquez sur "Actualiser" dans la section "Statut du Workflow" pour recharger toutes les données
+- Les informations sont également mises à jour automatiquement après chaque transaction
+
+#### Vérifier le statut de vote
+
+- La section "Vote" affiche automatiquement si vous avez déjà voté
+- Si vous avez voté, le message "✅ Vous avez déjà voté !" s'affiche
+
+#### Suivre les transactions
+
+- Après chaque transaction, un lien Etherscan s'affiche pour suivre la transaction sur le blockchain
+- Cliquez sur le lien pour voir les détails sur Etherscan
+
+### Dépannage
+
+#### "Vous devez être ADMIN pour..."
+- Vérifiez que vous êtes connecté avec le compte déployeur (ADMIN)
+- Vérifiez que le rôle ADMIN est bien attribué à votre compte
+
+#### "Le vote n'est pas encore ouvert"
+- Vérifiez que la phase VOTE est activée
+- Attendez 20 secondes après l'activation de la phase VOTE
+- Le timer affiche le temps restant
+
+#### "Vous avez déjà voté !"
+- Chaque adresse ne peut voter qu'une seule fois
+- Un NFT de vote a été créé pour votre adresse
+- Utilisez un autre compte MetaMask pour voter à nouveau
+
+#### Les candidats n'apparaissent pas
+- Vérifiez que vous êtes en phase REGISTER_CANDIDATES pour enregistrer
+- Cliquez sur "Actualiser" pour recharger les données
+- Vérifiez que les adresses des contrats dans `config.js` sont correctes
+
+#### Erreur de connexion MetaMask
+- Vérifiez que MetaMask est installé et activé
+- Vérifiez que vous êtes sur le réseau Sepolia
+- Rafraîchissez la page et réessayez
+
 ## 🔗 Adresses des Contrats Déployés sur Sepolia
 
 ### VoteNFT
@@ -332,26 +495,6 @@ Mint un NFT de vote. Accessible uniquement par VotingSystem.
 #### `hasVoted(address voter)`
 Vérifie si un votant a déjà voté.
 
-## 🤝 Contribution
 
-Ce projet est un exemple éducatif. Pour contribuer :
 
-1. Fork le projet
-2. Créez une branche pour votre fonctionnalité
-3. Committez vos changements
-4. Poussez vers la branche
-5. Ouvrez une Pull Request
-
-## 📄 Licence
-
-MIT License - Voir le fichier LICENSE pour plus de détails.
-
-## 🙏 Remerciements
-
-- [Foundry](https://book.getfoundry.sh/) pour le framework de développement
-- [OpenZeppelin](https://www.openzeppelin.com/) pour les contrats sécurisés
-- La communauté Ethereum pour les ressources et le support
-
----
-
-**Note** : Ce projet est à des fins éducatives. Assurez-vous de faire auditer vos contrats avant un déploiement en production.
+**Note** : Ce projet est à des fins éducatives.
