@@ -8,7 +8,7 @@ Un système de vote complet et sécurisé implémenté en Solidity avec Foundry,
 
 - [Foundry](https://book.getfoundry.sh/getting-started/installation)
 - MetaMask installé dans votre navigateur
-- ETH Sepolia pour les transactions (obtenez-en sur un [faucet Sepolia](https://sepoliafaucet.com/))
+- ETH Sepolia pour les transactions
 
 ### Installation
 
