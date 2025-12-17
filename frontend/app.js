@@ -149,6 +149,7 @@ function disconnectWallet() {
     document.getElementById('wallet-info').style.display = 'none';
     document.getElementById('admin-section').style.display = 'none';
     document.getElementById('founder-section').style.display = 'none';
+    document.getElementById('winner-section').style.display = 'none';
 }
 
 // Charger les informations du wallet
@@ -178,6 +179,13 @@ async function checkUserRoles() {
         // Afficher les sections appropriées
         document.getElementById('admin-section').style.display = userRoles.admin ? 'block' : 'none';
         document.getElementById('founder-section').style.display = userRoles.founder ? 'block' : 'none';
+        
+        // Masquer/afficher le bouton "Déterminer le vainqueur" selon le rôle admin
+        // (la section winner elle-même reste visible pour tous)
+        const winnerSection = document.getElementById('winner-section');
+        if (winnerSection && winnerSection.style.display !== 'none') {
+            document.getElementById('determine-winner').style.display = userRoles.admin ? 'block' : 'none';
+        }
     } catch (error) {
         console.error('Erreur lors de la vérification des rôles:', error);
     }
@@ -225,9 +233,15 @@ async function loadWorkflowStatus() {
             document.getElementById('vote-timer').style.display = 'none';
         }
 
-        // Afficher la section winner si COMPLETED
+        // Afficher la section winner si COMPLETED (visible pour tous)
         if (status == 3) {
             document.getElementById('winner-section').style.display = 'block';
+            // Masquer/afficher le bouton selon le rôle admin
+            document.getElementById('determine-winner').style.display = userRoles.admin ? 'block' : 'none';
+            // Charger et afficher le vainqueur si pas encore affiché
+            await loadWinner();
+        } else {
+            document.getElementById('winner-section').style.display = 'none';
         }
 
     } catch (error) {
@@ -741,6 +755,16 @@ async function vote(candidateId) {
 
 // Déterminer le vainqueur
 async function determineWinner() {
+    if (!userAddress) {
+        alert('Veuillez vous connecter');
+        return;
+    }
+
+    if (!userRoles.admin) {
+        alert('Vous devez être ADMIN pour déterminer le vainqueur');
+        return;
+    }
+
     if (!provider) {
         provider = new ethers.BrowserProvider(window.ethereum);
     }
@@ -788,9 +812,98 @@ async function determineWinner() {
         }
         
         showTransactionStatus('Vainqueur déterminé avec succès !', 'success', tx.hash);
+        
+        // Recharger le vainqueur pour l'afficher
+        await loadWinner();
     } catch (error) {
         console.error('Erreur:', error);
         showTransactionStatus('Erreur: ' + error.message, 'error');
+    }
+}
+
+// Charger et afficher le vainqueur (accessible à tous, pas besoin d'être admin)
+async function loadWinner() {
+    if (!provider) {
+        provider = new ethers.BrowserProvider(window.ethereum);
+    }
+
+    const contract = new ethers.Contract(
+        CONFIG.VOTING_SYSTEM_ADDRESS,
+        CONFIG.VOTING_SYSTEM_ABI,
+        provider
+    );
+
+    try {
+        // Vérifier que nous sommes en phase COMPLETED
+        const status = await contract.workflowStatus();
+        if (Number(status) !== 3) {
+            return; // Pas en phase COMPLETED
+        }
+
+        // Récupérer tous les candidats
+        const candidateIds = await contract.getAllCandidateIds();
+        
+        if (candidateIds.length === 0) {
+            document.getElementById('winner-info').innerHTML = '<p class="error">Aucun candidat enregistré</p>';
+            return;
+        }
+
+        // Trouver le candidat avec le plus de votes
+        let maxVotes = 0n;
+        let winnerId = null;
+        let winnerName = '';
+        let winnerVoteCount = 0n;
+
+        for (let i = 0; i < candidateIds.length; i++) {
+            const id = candidateIds[i];
+            
+            // Décoder le candidat (même logique que dans loadCandidates)
+            try {
+                const iface = contract.interface;
+                const data = iface.encodeFunctionData("getCandidate", [id]);
+                const result = await provider.call({
+                    to: CONFIG.VOTING_SYSTEM_ADDRESS,
+                    data: data
+                });
+                
+                const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+                const hexData = result.startsWith('0x') ? result.slice(2) : result;
+                const offset = parseInt(hexData.slice(0, 64), 16);
+                const tupleData = "0x" + hexData.slice(offset * 2);
+                const types = ["uint256", "string", "uint256", "uint256"];
+                const decoded = abiCoder.decode(types, tupleData);
+                
+                const candidateId = decoded[0];
+                const candidateName = decoded[1];
+                const voteCount = decoded[3];
+
+                if (voteCount > maxVotes) {
+                    maxVotes = voteCount;
+                    winnerId = candidateId;
+                    winnerName = candidateName;
+                    winnerVoteCount = voteCount;
+                }
+            } catch (e) {
+                console.error('Erreur lors du décodage du candidat:', e);
+                continue;
+            }
+        }
+
+        // Afficher le vainqueur
+        if (winnerId && maxVotes > 0n) {
+            document.getElementById('winner-info').innerHTML = `
+                <div class="winner-card">
+                    <h3>🏆 ${winnerName}</h3>
+                    <p><strong>ID:</strong> ${winnerId.toString()}</p>
+                    <p><strong>Votes:</strong> ${winnerVoteCount.toString()}</p>
+                </div>
+            `;
+        } else {
+            document.getElementById('winner-info').innerHTML = '<p class="error">Aucun vote enregistré</p>';
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement du vainqueur:', error);
+        document.getElementById('winner-info').innerHTML = '<p class="error">Erreur lors du chargement du vainqueur</p>';
     }
 }
 
