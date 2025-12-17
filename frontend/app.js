@@ -176,7 +176,7 @@ async function loadWorkflowStatus() {
         if (status == 2) {
             const voteStartTime = await contract.voteStartTime();
             const currentTime = Math.floor(Date.now() / 1000);
-            const delaySeconds = 10; // 10 secondes pour les tests
+            const delaySeconds = 3600; // 1 heure
             const timeRemaining = Number(voteStartTime) + delaySeconds - currentTime;
 
             if (timeRemaining > 0) {
@@ -254,11 +254,33 @@ async function loadCandidates() {
         const voteOptionsHTML = [];
 
         // Dans ethers v6, les tableaux sont des objets, convertir en array
-        const idsArray = Array.isArray(candidateIds) ? candidateIds : Array.from(candidateIds);
+        let idsArray;
+        if (Array.isArray(candidateIds)) {
+            idsArray = candidateIds;
+        } else if (candidateIds && typeof candidateIds === 'object') {
+            // Convertir l'objet array-like en vrai array
+            idsArray = [];
+            try {
+                const length = Number(candidateIds.length || 0);
+                for (let j = 0; j < length; j++) {
+                    if (candidateIds[j] !== undefined) {
+                        idsArray.push(candidateIds[j]);
+                    }
+                }
+            } catch (e) {
+                console.error('Erreur lors de la conversion du tableau:', e);
+                idsArray = [];
+            }
+        } else {
+            console.error('Format de candidateIds inattendu:', candidateIds);
+            idsArray = [];
+        }
+        
+        console.log(`Nombre de candidats trouvés: ${idsArray.length}`, idsArray);
         
         for (let i = 0; i < idsArray.length; i++) {
             const id = idsArray[i];
-            // Décoder manuellement les données hex pour éviter les problèmes avec ethers v6
+            // Décoder les données avec AbiCoder directement (plus fiable)
             let candidateId, candidateName, amountReceived, voteCount;
             try {
                 const iface = contract.interface;
@@ -268,57 +290,111 @@ async function loadCandidates() {
                     data: data
                 });
                 
-                // Décoder manuellement avec AbiCoder
-                const abiCoder = ethers.AbiCoder.defaultAbiCoder();
-                // Le format de retour est: (uint256, string, uint256, uint256)
-                // Mais les strings sont encodés avec un offset, donc on doit décoder différemment
+                console.log(`Données brutes pour candidat ${id}:`, result.substring(0, 200));
                 
-                // Essayer de décoder avec l'interface
-                try {
-                    const decoded = iface.decodeFunctionResult("getCandidate", result);
-                    candidateId = decoded[0];
-                    candidateName = decoded[1];
-                    amountReceived = decoded[2];
-                    voteCount = decoded[3];
-                } catch (decodeError) {
-                    // Si le décodage automatique échoue, décoder manuellement
-                    // Format: offset (32 bytes), puis tuple avec id, string_offset, amount, votes
-                    const hexData = result.startsWith('0x') ? result.slice(2) : result;
-                    
-                    // Lire l'offset du tuple (premiers 32 bytes = 64 chars hex)
-                    const tupleOffset = parseInt(hexData.slice(0, 64), 16);
-                    
-                    // Les données du tuple commencent à l'offset (en bytes, donc *2 pour chars hex)
-                    const tupleStart = tupleOffset * 2;
-                    
-                    // Lire id (32 bytes = 64 chars hex)
-                    candidateId = BigInt("0x" + hexData.slice(tupleStart, tupleStart + 64));
-                    
-                    // Lire string offset (32 bytes)
-                    const stringOffset = parseInt(hexData.slice(tupleStart + 64, tupleStart + 128), 16);
-                    
-                    // Lire amountReceived (32 bytes)
-                    amountReceived = BigInt("0x" + hexData.slice(tupleStart + 128, tupleStart + 192));
-                    
-                    // Lire voteCount (32 bytes)
-                    voteCount = BigInt("0x" + hexData.slice(tupleStart + 192, tupleStart + 256));
-                    
-                    // Décoder le string (commence à l'offset indiqué, en bytes donc *2)
-                    const stringDataStart = stringOffset * 2;
-                    const stringLength = parseInt(hexData.slice(stringDataStart, stringDataStart + 64), 16);
-                    const stringHex = hexData.slice(stringDataStart + 64, stringDataStart + 64 + stringLength * 2);
-                    candidateName = ethers.toUtf8String("0x" + stringHex);
+                // Utiliser AbiCoder directement pour décoder
+                const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+                const hexData = result.startsWith('0x') ? result.slice(2) : result;
+                
+                // Le format de retour est: offset (32 bytes) puis tuple (uint256, string, uint256, uint256)
+                const offset = parseInt(hexData.slice(0, 64), 16);
+                console.log('Offset du tuple:', offset);
+                
+                // Les données du tuple commencent à l'offset
+                const tupleData = "0x" + hexData.slice(offset * 2);
+                
+                // Décoder le tuple directement
+                const types = ["uint256", "string", "uint256", "uint256"];
+                const decoded = abiCoder.decode(types, tupleData);
+                
+                console.log('Décodage avec AbiCoder:', decoded);
+                console.log('Type de decoded:', typeof decoded, 'isArray:', Array.isArray(decoded));
+                console.log('Longueur:', decoded.length, 'Valeurs:', decoded[0], decoded[1], decoded[2], decoded[3]);
+                
+                // Dans ethers v6, decoded est un array
+                candidateId = decoded[0];
+                candidateName = decoded[1];
+                amountReceived = decoded[2];
+                voteCount = decoded[3];
+                
+                // Vérifier immédiatement si le nom est valide
+                if (!candidateName || candidateName === '' || candidateName === null || candidateName === undefined) {
+                    console.error('❌ Nom vide après décodage AbiCoder! decoded[1] =', decoded[1], 'type:', typeof decoded[1]);
+                } else {
+                    console.log('✅ Nom décodé avec succès:', candidateName);
                 }
+                
+                console.log('Valeurs extraites:', { 
+                    candidateId: candidateId.toString(), 
+                    candidateName, 
+                    amountReceived: amountReceived.toString(), 
+                    voteCount: voteCount.toString() 
+                });
             } catch (error) {
                 console.error(`Erreur lors de la récupération du candidat ${id}:`, error);
-                continue;
+                // En cas d'erreur, utiliser des valeurs par défaut
+                candidateId = id;
+                candidateName = null;
+                amountReceived = 0n;
+                voteCount = 0n;
             }
+            
+            // Vérifier que les valeurs sont valides
+            if (!candidateName || candidateName === '' || candidateName === null || candidateName === undefined) {
+                console.warn(`Nom de candidat invalide pour l'ID ${id}, valeurs:`, { 
+                    candidateId, 
+                    candidateName, 
+                    amountReceived, 
+                    voteCount,
+                    typeCandidateName: typeof candidateName
+                });
+                
+                // Essayer une dernière fois avec AbiCoder directement
+                try {
+                    const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+                    const iface = contract.interface;
+                    const data = iface.encodeFunctionData("getCandidate", [id]);
+                    const result = await provider.call({
+                        to: CONFIG.VOTING_SYSTEM_ADDRESS,
+                        data: data
+                    });
+                    
+                    // Décoder avec AbiCoder directement
+                    const types = ["uint256", "string", "uint256", "uint256"];
+                    // Le résultat commence après l'offset (32 bytes)
+                    const hexData = result.startsWith('0x') ? result.slice(2) : result;
+                    const offset = parseInt(hexData.slice(0, 64), 16);
+                    const tupleData = "0x" + hexData.slice(offset * 2);
+                    const decoded = abiCoder.decode(types, tupleData);
+                    console.log('Décodage avec AbiCoder:', decoded);
+                    
+                    if (decoded && decoded[1]) {
+                        candidateName = decoded[1];
+                        candidateId = decoded[0];
+                        amountReceived = decoded[2];
+                        voteCount = decoded[3];
+                        console.log('Nom récupéré avec AbiCoder:', candidateName);
+                    }
+                } catch (e) {
+                    console.error('Erreur avec AbiCoder:', e);
+                }
+                
+                // Si toujours pas de nom, utiliser un nom par défaut
+                if (!candidateName || candidateName === '' || candidateName === null || candidateName === undefined) {
+                    candidateName = `Candidat ${candidateId}`;
+                }
+            } else {
+                console.log(`✅ Nom de candidat valide: "${candidateName}" pour l'ID ${candidateId}`);
+            }
+            
+            // Convertir BigInt en string pour les valeurs
+            const candidateIdStr = candidateId.toString ? candidateId.toString() : String(candidateId);
             
             const candidateCard = `
                 <div class="candidate-card">
                     <h3>${candidateName}</h3>
                     <div class="candidate-info">
-                        <p><strong>ID:</strong> ${candidateId.toString()}</p>
+                        <p><strong>ID:</strong> ${candidateIdStr}</p>
                         <p><strong>Financement:</strong> ${ethers.formatEther(amountReceived)} ETH</p>
                         <p><strong>Votes:</strong> ${voteCount.toString()}</p>
                     </div>
@@ -326,8 +402,10 @@ async function loadCandidates() {
             `;
             candidatesHTML.push(candidateCard);
 
-            const option = `<option value="${candidateId}">${candidateName}</option>`;
+            // Ajouter l'option au select de financement
+            const option = `<option value="${candidateIdStr}">${candidateName} (ID: ${candidateIdStr})</option>`;
             fundOptions.push(option);
+            console.log(`Candidat ajouté au select: ${candidateName} (ID: ${candidateIdStr})`);
 
             const voteOption = `
                 <button class="vote-btn" onclick="vote(${candidateId})">
@@ -338,7 +416,19 @@ async function loadCandidates() {
         }
 
         candidatesList.innerHTML = candidatesHTML.join('');
-        fundSelect.innerHTML = '<option value="">Sélectionner un candidat</option>' + fundOptions.join('');
+        
+        // Mettre à jour le select de financement
+        console.log(`Nombre d'options de financement: ${fundOptions.length}`);
+        if (fundOptions.length > 0) {
+            const selectHTML = '<option value="">Sélectionner un candidat</option>' + fundOptions.join('');
+            fundSelect.innerHTML = selectHTML;
+            console.log('Select de financement mis à jour avec', fundOptions.length, 'options');
+            console.log('Contenu du select:', fundSelect.innerHTML.substring(0, 200));
+        } else {
+            fundSelect.innerHTML = '<option value="">Aucun candidat disponible</option>';
+            console.warn('Aucune option à ajouter au select de financement');
+        }
+        
         voteOptions.innerHTML = voteOptionsHTML.join('');
 
     } catch (error) {
