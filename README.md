@@ -62,18 +62,6 @@ forge script script/Deploy.s.sol:DeployScript --rpc-url sepolia --broadcast
 forge script script/Deploy.s.sol:DeployScript --rpc-url sepolia --broadcast --verify
 ```
 
-## 📝 Commandes Utiles
-
-```bash
-# Formater le code
-forge fmt
-
-# Lancer Anvil (blockchain locale)
-anvil
-
-# Vérifier un contrat
-forge verify-contract <ADDRESS> <CONTRACT> --chain sepolia --etherscan-api-key $ETHERSCAN_API_KEY
-```
 
 ## 🔗 Contrats Déployés sur Sepolia
 
